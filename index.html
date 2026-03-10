@@ -1,8 +1,13 @@
 <!DOCTYPE html>
-<html>
+<html lang="es">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Webcam Real-time Mirror + Download</title>
     <style>
+        * {
+            box-sizing: border-box;
+        }
         body { 
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
             display: flex; 
@@ -10,52 +15,88 @@
             align-items: center; 
             background: #1a1a1a; 
             color: white; 
-            margin-top: 30px;
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
         }
+        h3 {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        /* Contenedor para mantener la proporción del canvas */
+        .canvas-container {
+            width: 100%;
+            max-width: 500px; /* Tamaño máximo en PC */
+            display: flex;
+            justify-content: center;
+        }
+
         canvas { 
+            width: 100%; /* Se adapta al ancho del contenedor */
+            height: auto; /* Mantiene la proporción */
+            aspect-ratio: 1 / 1; /* Fuerza a que sea un cuadrado perfecto */
             border: 4px solid #444; 
             border-radius: 12px; 
             box-shadow: 0 10px 30px rgba(0,0,0,0.5);
             background: #000;
-            max-width: 100%; /* Para que sea responsivo en móviles */
         }
-        #video { display: none; } /* El video original no se muestra */
+        
+        #video { display: none; } /* El video original oculto */
         
         .controls { 
-            margin: 20px;
+            margin-top: 25px;
             display: flex;
-            gap: 15px; /* Espacio entre los botones */
-            flex-wrap: wrap;
-            justify-content: center;
+            flex-direction: column; /* Apila los botones en móvil */
+            gap: 15px; 
+            width: 100%;
+            max-width: 400px;
         }
         
         button {
+            width: 100%; /* Botones anchos para tocar fácil en móvil */
             background-color: #007bff;
             color: white;
             border: none;
-            padding: 12px 24px;
+            padding: 15px 20px; /* Más padding para dedos */
             font-size: 16px;
+            font-weight: bold;
             border-radius: 50px;
             cursor: pointer;
             transition: background 0.3s, transform 0.2s;
             box-shadow: 0 4px 15px rgba(0, 123, 255, 0.3);
         }
         
-        button:hover { background-color: #0056b3; transform: scale(1.05); }
-        button:active { transform: scale(0.95); }
-        #switchBtn { background-color: #28a745; box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3); }
+        button:hover { background-color: #0056b3; transform: scale(1.02); }
+        button:active { transform: scale(0.98); }
+        
+        #switchBtn { 
+            background-color: #28a745; 
+            box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3); 
+        }
         #switchBtn:hover { background-color: #218838; }
+
+        /* Media query para pantallas más grandes (Tablets y PC) */
+        @media (min-width: 600px) {
+            .controls {
+                flex-direction: row; /* Botones uno al lado del otro */
+                max-width: 600px;
+            }
+        }
     </style>
 </head>
 <body>
-    <h3>Espejo Simétrico en Tiempo Real</h3>
+    <h3>Espejo Simétrico</h3>
     
     <video id="video" width="500" height="500" autoplay playsinline></video>
-    <canvas id="canvas" width="500" height="500"></canvas>
+    
+    <div class="canvas-container">
+        <canvas id="canvas" width="500" height="500"></canvas>
+    </div>
 
     <div class="controls">
-        <button id="switchBtn">Cambiar Cámara</button>
-        <button id="downloadBtn">Descargar Captura</button>
+        <button id="switchBtn">🔄 Cambiar Cámara</button>
+        <button id="downloadBtn">📸 Descargar Captura</button>
     </div>
 
     <script>
@@ -66,17 +107,14 @@
         const switchBtn = document.getElementById('switchBtn');
 
         let currentStream = null;
-        let useFrontCamera = true; // Empieza con la cámara frontal
-        let isDrawing = false; // Bandera para evitar múltiples bucles de dibujo
+        let useFrontCamera = true;
+        let isDrawing = false;
 
-        // 1. Función para iniciar o cambiar la cámara
         function startCamera() {
-            // Si ya hay una cámara encendida, detenemos sus pistas (tracks) primero
             if (currentStream) {
                 currentStream.getTracks().forEach(track => track.stop());
             }
 
-            // Definimos qué cámara usar
             const constraints = {
                 video: {
                     facingMode: useFrontCamera ? "user" : "environment",
@@ -91,7 +129,6 @@
                     video.srcObject = stream;
                     video.play();
                     
-                    // Solo iniciamos el bucle si no está corriendo ya
                     if (!isDrawing) {
                         isDrawing = true;
                         draw(); 
@@ -100,23 +137,21 @@
                 .catch(err => alert("Error al acceder a la cámara: " + err));
         }
 
-        // 2. Bucle de dibujo (60 fps aprox)
         function draw() {
             if (video.paused || video.ended) {
                 requestAnimationFrame(draw);
                 return;
             }
 
-            const w = canvas.width;
-            const h = canvas.height;
+            const w = canvas.width;  // Internamente sigue siendo 500
+            const h = canvas.height; // Internamente sigue siendo 500
 
-            // Limpiar el canvas antes de dibujar el nuevo frame
             context.clearRect(0, 0, w, h);
 
-            // Dibujar mitad izquierda original
+            // Cortar y dibujar mitad izquierda
             context.drawImage(video, 0, 0, w / 2, h, 0, 0, w / 2, h);
 
-            // Dibujar mitad derecha espejada
+            // Espejar y dibujar mitad derecha
             context.save();
             context.scale(-1, 1);
             context.drawImage(video, 0, 0, w / 2, h, -w, 0, w / 2, h);
@@ -125,22 +160,19 @@
             requestAnimationFrame(draw);
         }
 
-        // 3. Lógica para cambiar de cámara
         switchBtn.addEventListener('click', () => {
-            useFrontCamera = !useFrontCamera; // Invertir el valor
-            startCamera(); // Reiniciar con la nueva configuración
+            useFrontCamera = !useFrontCamera;
+            startCamera();
         });
 
-        // 4. Lógica de descarga
         downloadBtn.addEventListener('click', () => {
             const imageURL = canvas.toDataURL("image/png");
             const link = document.createElement('a');
             link.href = imageURL;
-            link.download = `espejo-captura-${Date.now()}.png`; 
+            link.download = `espejo-${Date.now()}.png`; 
             link.click();
         });
 
-        // Inicializar la cámara al cargar la página
         startCamera();
     </script>
 </body>
