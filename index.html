@@ -17,10 +17,17 @@
             border-radius: 12px; 
             box-shadow: 0 10px 30px rgba(0,0,0,0.5);
             background: #000;
+            max-width: 100%; /* Para que sea responsivo en móviles */
         }
         #video { display: none; } /* El video original no se muestra */
         
-        .controls { margin: 20px; }
+        .controls { 
+            margin: 20px;
+            display: flex;
+            gap: 15px; /* Espacio entre los botones */
+            flex-wrap: wrap;
+            justify-content: center;
+        }
         
         button {
             background-color: #007bff;
@@ -36,15 +43,18 @@
         
         button:hover { background-color: #0056b3; transform: scale(1.05); }
         button:active { transform: scale(0.95); }
+        #switchBtn { background-color: #28a745; box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3); }
+        #switchBtn:hover { background-color: #218838; }
     </style>
 </head>
 <body>
     <h3>Espejo Simétrico en Tiempo Real</h3>
     
-    <video id="video" width="500" height="500" autoplay></video>
+    <video id="video" width="500" height="500" autoplay playsinline></video>
     <canvas id="canvas" width="500" height="500"></canvas>
 
     <div class="controls">
+        <button id="switchBtn">Cambiar Cámara</button>
         <button id="downloadBtn">Descargar Captura</button>
     </div>
 
@@ -53,20 +63,55 @@
         const canvas = document.getElementById('canvas');
         const context = canvas.getContext('2d');
         const downloadBtn = document.getElementById('downloadBtn');
+        const switchBtn = document.getElementById('switchBtn');
 
-        // 1. Acceder a la cámara
-        navigator.mediaDevices.getUserMedia({ video: true })
-            .then(stream => { 
-                video.srcObject = stream;
-                video.play();
-                draw(); 
-            })
-            .catch(err => alert("Error al acceder a la cámara: " + err));
+        let currentStream = null;
+        let useFrontCamera = true; // Empieza con la cámara frontal
+        let isDrawing = false; // Bandera para evitar múltiples bucles de dibujo
+
+        // 1. Función para iniciar o cambiar la cámara
+        function startCamera() {
+            // Si ya hay una cámara encendida, detenemos sus pistas (tracks) primero
+            if (currentStream) {
+                currentStream.getTracks().forEach(track => track.stop());
+            }
+
+            // Definimos qué cámara usar
+            const constraints = {
+                video: {
+                    facingMode: useFrontCamera ? "user" : "environment",
+                    width: { ideal: 500 },
+                    height: { ideal: 500 }
+                }
+            };
+
+            navigator.mediaDevices.getUserMedia(constraints)
+                .then(stream => { 
+                    currentStream = stream;
+                    video.srcObject = stream;
+                    video.play();
+                    
+                    // Solo iniciamos el bucle si no está corriendo ya
+                    if (!isDrawing) {
+                        isDrawing = true;
+                        draw(); 
+                    }
+                })
+                .catch(err => alert("Error al acceder a la cámara: " + err));
+        }
 
         // 2. Bucle de dibujo (60 fps aprox)
         function draw() {
+            if (video.paused || video.ended) {
+                requestAnimationFrame(draw);
+                return;
+            }
+
             const w = canvas.width;
             const h = canvas.height;
+
+            // Limpiar el canvas antes de dibujar el nuevo frame
+            context.clearRect(0, 0, w, h);
 
             // Dibujar mitad izquierda original
             context.drawImage(video, 0, 0, w / 2, h, 0, 0, w / 2, h);
@@ -80,17 +125,23 @@
             requestAnimationFrame(draw);
         }
 
-        // 3. Lógica de descarga
+        // 3. Lógica para cambiar de cámara
+        switchBtn.addEventListener('click', () => {
+            useFrontCamera = !useFrontCamera; // Invertir el valor
+            startCamera(); // Reiniciar con la nueva configuración
+        });
+
+        // 4. Lógica de descarga
         downloadBtn.addEventListener('click', () => {
-            // Convertir el contenido del canvas a una URL de imagen (PNG)
             const imageURL = canvas.toDataURL("image/png");
-            
-            // Crear un enlace temporal "fantasma" para forzar la descarga
             const link = document.createElement('a');
             link.href = imageURL;
-            link.download = `espejo-captura-${Date.now()}.png`; // Nombre único con timestamp
+            link.download = `espejo-captura-${Date.now()}.png`; 
             link.click();
         });
+
+        // Inicializar la cámara al cargar la página
+        startCamera();
     </script>
 </body>
 </html>
